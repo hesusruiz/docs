@@ -63,7 +63,7 @@ Block propagation follows the same basic mechanism, with some optimizations give
 
 In a permissioned network, the EThereum clients provide some capabilities not normally used in permissionless networks enabling some flexibility on "shaping" the network.
 
-== Permissioning
+==== Permissioning
 
 In permissioned networks, the Ethereum clients provide the ability to define for each node a list of "permissioned nodes".
 
@@ -71,7 +71,7 @@ The list of permissioned nodes specify the node IDs that will be accepted by a g
 
 Currently, both Quorum and Pantheon support a per-node permission list, which means that each node in the network can have a different list of nodes which are permitted to connect.
 
-== Static nodes list
+==== Static nodes list
 
 This is a per-node list. The list of static nodes specifies the nodes with which the given node will always try to connect and keep the connection alive. The nodes in this list may be any node in the network and not necessarily neighbours. The nodes in this list are connected directly at the TCP level and so sending messages (transactions or blocks) do not need re-transmissions with the p2p protocol.
 
@@ -87,4 +87,77 @@ In a big permissioned Ethereum network the consensus nodes are subject to a lot 
 
 * Stablishing and tear-down of TCP communications with all the peers that try to stablish connections with them for the P2P dissemination of transactions and blocks. If the peers of consensus nodes are appearing and dissapearing, the pattern of communications is not very stable and causes a lot of work at the network stack level.
 
-In addition, 
+In addition, maintenance of the nodes allowed to participate in the network is difficult, given the nature of the per-node lists mentioned above.
+
+== Proposed network structure
+
+The following diagram describes the structure of an actual permissioned network with some 100 nodes in production.
+
+image::redt_visual.png[]
+
+In this network all nodes are running exactly the same client software (in this case Quorum), but using the permissioning and static nodes capabilities, three layers are defined with nodes specialized in different functions.
+
+=== Regular nodes
+
+The Regular nodes are the nodes operated by all the members of the network. They are used for injecting transactions and reading from the blockchain. The Regular nodes are normally full nodes that keep a copy of the blockchain, to reduce the level of trust required from each member with respect to the rest of the network. However, the members are free to maintain as much history of the blockchain as they wish, to minimize storage in the nodes. A separate document describes how such mechanisms could be implemented in a public-permissioned network in such a way that the mechanism is effective while minimizing the trust requirements and maximizing decentralization.
+
+=== Consensus nodes
+
+The Consensus nodes are specialized on executing the consensus algorithm. The static-nodes list and the permissioned-nodes lists are used to specify permanent point-to-point connections among the consensus nodes, in order to ensure a very stable communications pattern. The Consensus nodes are also connected with the Boot/Permissioning nodes. The permissioned-nodes list is used to ensure that the Regular nodes can not connect dsirectly with the Consensus nodes.
+
+=== Boot/Permissioning nodes
+
+The Boot/Permissioning nodes (from now on called just Permissioning nodes) are used for three related purposes:
+
+. *Bootstrapping*, that is, for helping new nodes to connect to the network. The boot nodes are in a stable and well-known list of nodes that anybody can use to connect to the network. For example, in the public Ethereum network there are 3 boot nodes maintained by the Ethereum foundation exactly for this purpose. In the network depicted above we can see 5 boot nodes, and by default the Regular nodes have these nodes specified in the static-nodes list. But this is not compulsory, and some members could collaborate among each other and define themselves static connections among their nodes if they feel the need.
+
+. *Permissioning at the network level*. The boot nodes have all the same permissioning list with all Regular nodes in the network. That is, when a new Regular node is added to the network, it is added to this list.
+
+. *Isolating Consensus nodes*. Regular nodes are allowed to connect directly at the TCP level to Permissioning nodes, but not to Consensus nodes. Please remember that thanks to the p2p protocol, messages can reach all nodes of the network without direct connectivity among them. This provides to the Consensus nodes a very stable environment for the efficient execution of the consensus algorithm.
+
+== Additional measures to increment network resiliency and inclusiveness
+
+The diagram above depicts 7 consensus nodes, but this is not fully correct. The network is implementing a novel on-chain governance of Consensus nodes execution, which we call "IBFT with proactive rotation and recovery", which is an enhancement of some proposed extensions in the literature, most notably the famous "Practical Byzantine Fault Tolerance and Proactive Recovery" (Castro and Liskov 2002).
+
+Standard implementations of PBFT and in particular IBFT in Quorum and Pantheon, tend to focus on masking failures. That is, they hide failures making them transparent to the users because the network continues working, but they do not manage those failures in a way that proactive or reactive measures can be taken to ensure the long-term health of the network.
+
+This is the reason why Alastria is implementing a set of tools surrounding the base IBFT consensus algorithm, which together with complementary off-chain governance processes allow the realization of
+the the principles of the governance of the blockchain as a Common-Pool Resource.
+
+The mechanism is illustrated in the following diagram.
+
+image::OnChainConsensus.jpg[]
+
+The following aspects can be observed:
+
+* The consensus nodes in the Active state (that is, actually executing the base
+IBFT algorithm) are being monitored.
+
+* The events signaling different types of faults are used for the reactive governance of the nodes. Even though it is not shown in the figure, in addition to the automated reaction, the events should be reported in a way that any participant in the blockchain network (not just the consensus nodes) can know what is happening at any moment. This is required to implement the high levels of transparency and collaborative monitoring that are required in such a network.
+
+* Depending on the severity of the fault detected (crash or byzantine), the system reacts automatically applying a graduated set of sanctions. For example, when the fault is byzantine (which means a malicious behaviour is suspected), the consensus node affected is put in quarantine, effectively stopping the node from participating in the consensus execution. If the owner is willing to continue participating, a manual process (off-chain governance) is required, with sufficient explanation and justification to the other members in order to be accepted again. An example of a byzantine behaviour that can be detected is a node sending two different blocks with the same block number to different nodes. The blocks ara digitally signed so the malicious action can not be denied if detected.
+
+== Discussion about the proposed structure
+
+=== Effect on network throughput
+
+The proposed structure should not have an adverse effect on network throughput. On the contrary, it should enable to increase it and keep it very stable.
+
+In an Ethereum network, there are typically two bottlenecks for network throughput.
+
+The first one it the *performance of the consensus algorithm*, and this is what is observed in the public Ethereum network. In a permissioned network with IBFT, the speed of execution of the consensus algorithm is heavily affected by the communication message complexity among consensus nodes (increases with the square of the number of consensus nodes), in other words it is *network-bound*. The proposed network structure provides to the consensus nodes a very stable environment for the execution of the consensus algorithm, free from the overheads of random connections and disconnections from Regular nodes, which can come and go as the members wish. There is of course no compromise or similar SLA for operating the Regular nodes, and the members are free to start and stop them at will. This means that the proposed structure is ideal for eliminating the first bottleneck.
+
+The second bottleneck is *CPU-bound* and caused because all nodes in the network have to execute all the transactions injected by all nodes in the network. This is not a problem in the public Ethereum network, because of the first bottleneck. But in a permissioned network with very fast consensus algorithm execution (big consensus machines and good connectivity among consensus nodes), it is very likely that Regular nodes hit the second bottleneck, especially if the Regular nodes have significantly less powerful machines than the Consensus nodes.
+
+In a permissioned network with some geographic locality and relatively good communication links among all participating nodes with acceptable latencies (eg Europe), it is highly unlikely that adding the requirement that Regular nodes need two communication hops to contact a Consensu node is going to affect network performance, because the two bottlenecks mentioned before are much more prominent.
+
+=== Resiliency of the network
+
+It could be argued that the resiliency of the network is reduced, because a p2p network has been converted to a hierarchical network with a small number of nodes (the boot nodes) being a single point of failure.
+
+Actually, the real resiliency (and safety and liveness) of the network depends fundamentally on the set of consensus nodes operating continuosly and in a manner that they are safe from the attacks from malicious actors. The proposed structure, even though currently does not cover every attck, is well suited to implement additional measures of defense against attacks. For example, the consensus nodes could have two network adapters and the consensus algorithm could be running on a specialized network protected from the rest of the world by specialized firewalls (VPN), making the whole network much more resilient.
+
+In the proposed structure, the boot nodes are just "proxies" or "pass-through" to isolate the Consensus nodes from direct connections from Regular nodes. They are all interconnected, so as long as there is one alive, the network continues working. It is very easy to launch additional nodes if required, so it is advisable to monitor proactively the health of boot nodes and manage proactively the number of nodes active at any given moment. In case of extreme need, it is enough to update the permissioning list in Consensus nodes to allow Regular nodes to connect directly, something that can be done without stopping the nodes. But given that it is easier to launch new Boot nodes, this is probably never needed.
+
+In principle, this could be achieved with specialized software, and this may be a line of future research. However, for simplicity of implementation, and taking into account that the Boot nodes ara also Permissioning nodes, we chose to use exactly the same client software to implement that function.
+
