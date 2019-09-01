@@ -91,7 +91,7 @@ In addition, maintenance of the nodes allowed to participate in the network is d
 
 == Proposed network structure
 
-The following diagram describes the structure of an actual permissioned network with some 100 nodes in production.
+To aid in the explanation, let me use as an example the structure of an actual public-permissioned network with some 100 nodes in production (Alastria RedT, which uses Quorum but the concepts are equally translated a Pantheon network).
 
 image::redt_visual.png[]
 
