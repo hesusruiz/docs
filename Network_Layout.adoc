@@ -1,4 +1,4 @@
-= Network layer design for EEA network
+= Network layer design for EBSI network (with EEA client)
 :author: Jesus Ruiz
 :email: hesus.ruiz@gmail.com
 :revnumber: 0.1
