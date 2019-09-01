@@ -1,0 +1,47 @@
+@startuml "EBSI_node"
+!include c4/C4_Container.puml
+
+LAYOUT_TOP_DOWN
+LAYOUT_WITH_LEGEND()
+
+System_Ext(essif, "ESSIF", "Natural person using ESSIF")
+
+Enterprise_Boundary(ent, "EBSI organization"){
+
+    System_Boundary(c1, "EBSI blockchain node"){
+        
+        Container(proxy, "Proxy server", "Nignx", "TLS termination, access control, basic DoS defense")
+        Container(app_server, "Minimal Application server", "Beego", "Performs some maintenance operations on the node")
+        Container(prometheus, "Monitoring", "Prometheus", "Gets monitoring metrics")
+        Container(grafana, "Local Dashboard", "Grafana", "Shows dashboard for local node")
+        ContainerDb(cb, "Data Store", "CEF Context Broker", "Stores JSON-LD data using the standard ETSI NGSI-LD interface")
+        Container(ethereum, "Ethereum node", "Pantheon", "Connects to the blockchain network")
+
+    }
+
+    System_Ext(core, "Core system", "Traditional Enterprise Systems")
+
+}
+
+System_Ext(eth_network, "EBSI Ethereum network")
+
+
+Rel(essif, proxy, "Uses", "HTTPS, JSON-RPC")
+
+Rel_R(core, proxy, "Uses", "JSON-RPC")
+
+Rel(proxy, app_server, "Uses", "HTTP")
+Rel(proxy, cb, "Read/write", "NGSI-LD")
+Rel(proxy, ethereum, "Uses", "JSON-RPC Ethereum API")
+Rel(proxy, prometheus, "Uses", "HTTP")
+Rel(proxy, grafana, "Uses", "HTTP")
+
+Rel_R(ethereum, eth_network, "Other Ethereum nodes")
+
+Lay_R(app_server, prometheus)
+Lay_R(prometheus, grafana)
+Lay_R(grafana, cb)
+Lay_R(cb, ethereum)
+
+
+@enduml
