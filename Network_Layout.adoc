@@ -1,0 +1,90 @@
+= Network layer design for EEA network
+:author: Jesus Ruiz
+:email: hesus.ruiz@gmail.com
+:revnumber: 0.1
+:revdate: 01-09-2019
+:numbered:
+:imagesdir: assets
+:icons: font
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+
+(Version: {revnumber}, Version Date: {revdate})
+
+== Introduction
+
+Before explaining the proposed network structure, lets refresh how networking works in an Ethereum network, common to all Ethereum clients. We only describe aspects which are relevant to the discussion.
+
+=== Lower level protocols
+
+==== Point-to-point encrypted transport protocol: RLPx
+
+This is a a *TCP-based point-to-point* transport protocol used for communication among Ethereum nodes.
+The protocol is *encrypted* and the messages on the wire are created from data structures using the RLP serialization format.
+
+RLP stands for Recursive Lengh Prefix, and its objective is to encode arbitrarily nested arrays of binary data. In this sense, is similar in objectives to Protobuf from Google.
+
+The protocol supports building on top different "capabilities", which enables multiplexing different higher level protocols on top of a single RLPx connection among two nodes.
+
+The most important capability in Ethereum is the "p2p" capability, which is present on all connections. 
+
+==== Node Discovery Protocol
+
+The Node Discovery Protocol is a *UDP-based* protocol. In order to be able to connect to the network, a node has to find a suitable set of peers called neighbours and which is a subset of the whole network.
+
+The neighbours of a node are the other nodes closer to the given node. The concep of proximity is not a geographical one, and a node can have neigbours in any region of the planet (if the network is geographycally distributed).
+
+The Ethereum node discovery protocol is a Kademlia-like Distributed Hash Table (DHT). Every node has an identity, which is its public key, acting as the 'node ID'.
+
+The 'distance' between two node IDs is the bitwise exclusive or on the hashes of the public keys, taken as the number.
+
+    distance(n1, n2) = keccak256(n1) XOR keccak256(n2)
+
+When a new node joins the network, it starts a discovery protocol in order to find a given set of closest neigbours (eg. 25 or 40 nodes), and tries to connect and keep those conections alive.
+
+In order to start the discovery protocol, the node has to be supplied with an initial list of one or more starting nodes called *boot nodes*. Each node in the network maintains a table with its neighbours, and the discovery protocol runs recursively asking the known nodes for its neighbours until it finds the given number of closest ones to the new one, according to the definition of distance given above.
+
+=== Ethereum Wire Protocol (ETH), the p2p protocol
+
+ETH is a protocol which implemente the p2p transmission capabilities of Ethereum, to disseminate transactions and blocks across the whole network, using an "epidemic" transmission protocol.
+
+It uses the RLPx point-to-point transport and the tables of neighbours (peers) built by the Node Discovery Protocol in each of the nodes in the network.
+
+A node keeps connections to a limited number of peers (can be set as a parameter).
+
+When a node receives a transaction from another node, it resends the transaction to its peers, which do the same with its own peers (following some rules to avoid overflowing the network with redundant messages).
+
+Block propagation follows the same basic mechanism, with some optimizations given the bigger size of messages compared to re-sending transactions. Basically, the full blocks are sent to a small fraction of connected peers (the square root of the total number of peers), while the other connected peers receive only the hashes of the blocks and they have to ask for the full block when they need it.
+
+=== Permissioning and Static nodes
+
+In a permissioned network, the EThereum clients provide some capabilities not normally used in permissionless networks enabling some flexibility on "shaping" the network.
+
+== Permissioning
+
+In permissioned networks, the Ethereum clients provide the ability to define for each node a list of "permissioned nodes".
+
+The list of permissioned nodes specify the node IDs that will be accepted by a given node if they try to start a connection with that node.
+
+Currently, both Quorum and Pantheon support a per-node permission list, which means that each node in the network can have a different list of nodes which are permitted to connect.
+
+== Static nodes list
+
+This is a per-node list. The list of static nodes specifies the nodes with which the given node will always try to connect and keep the connection alive. The nodes in this list may be any node in the network and not necessarily neighbours. The nodes in this list are connected directly at the TCP level and so sending messages (transactions or blocks) do not need re-transmissions with the p2p protocol.
+
+== Some communication-related problems to solve in big permissioned Ethereum networks
+
+In this document I will use the term "consensus node" to refer to the nodes that participate and execute the consensus algorithm. This is to make the term more general than Validators an even applicable to other blockchain networks like Fabric (they are called Orderers). In addition, the term Validator is misleading, because IBFT consensus nodes have the mission to order transactions and create blocks, and validation is ultimately performed in each and every client, because the the clients do not trust at all on consensus nodes.
+
+In a big permissioned Ethereum network the consensus nodes are subject to a lot of overhead because they have to do several things at the same time:
+
+* Executing the consensus algorithm itsef. This is really the core mission of the consensus nodes.
+
+* In order to do so, they have to stablish and maintain the connections with all the other consensus nodes, in order to execute the consensus algorithm. Ideally, this should be managed with point-to-point connections, and not using the p2p transmission.
+
+* Stablishing and tear-down of TCP communications with all the peers that try to stablish connections with them for the P2P dissemination of transactions and blocks. If the peers of consensus nodes are appearing and dissapearing, the pattern of communications is not very stable and causes a lot of work at the network stack level.
+
+In addition, 
