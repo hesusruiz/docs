@@ -1,0 +1,71 @@
+@startuml "Storage_sequence1"
+autonumber
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 10
+skinparam maxmessagesize 150
+
+
+participant "Entity1" as e1
+
+box "EBSI node1" #LightCyan
+    boundary "proxy1" as px1
+    control "AccessControl" as ac
+    database "DB1" as db1
+    participant "Eth1" as eth1
+end box
+
+
+box "EBSI node 2" #LightCyan
+    participant "Eth2" as eth2
+    database "DB2" as db2
+    boundary "proxy2" as px2
+end box
+
+participant "Entity2" as e2
+
+== Store data and create transaction ==
+e1 -> px1 : Write (tx + data\n+ access control)
+activate px1
+px1 -> db1 : Store data 
+px1 -> ac : Set acc control
+px1 -> eth1 : Wite (tx + pointer)
+deactivate px1
+
+eth1 <-> eth2 : Blockchain replication\n(tx + pointer)
+
+
+
+eth2 -> e2 : Signal event (pointer)
+
+== Access data when needed (first time) ==
+e2 -> px2 : Read (pointer)
+activate px2
+
+px2 -> px1 : Read
+activate px1
+
+px1 -> ac : Check access\ncontrol and\nlog for audit
+
+px1 -> db1 : Read data
+activate db1
+db1 --> px1 : Return data
+deactivate db1
+px1 --> px2 : Return data
+deactivate px1
+
+px2 -> db2 : Store data
+px2 --> e2 : Return data
+deactivate px2
+
+== Access data the second time ==
+e2 -> px2 : Read (pointer)
+activate px2
+px2 -> db2 : Read
+activate db2
+db2 --> px2 : Return cached data
+deactivate db2
+px2 -> e2 : Return data
+deactivate px2
+
+
+@enduml

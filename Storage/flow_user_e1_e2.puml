@@ -1,0 +1,21 @@
+@startuml
+autonumber
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 10
+skinparam ParticipantPadding 50
+hide footbox
+
+title Send data by request from user
+
+actor User
+participant "Entity 1" as e1
+participant "Entity 2" as e2
+
+User -> e1 : Perform operation
+rnote over e1
+ Normal way to send data
+ (eg. bank transfer)
+endrnote
+e1 -> e2 : Send data
+
+@enduml
