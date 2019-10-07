@@ -7,14 +7,15 @@ skinparam ParticipantPadding 50
 title Flow with consent from user
 
 actor User
-participant "Entity 1" as e1
-participant "Entity 2" as e2
+participant "Source\nEntity" as e1
+collections "Target\nEntities" as e2
 
 User -> e2 : Consent to access my data
 e2 -> e1 : Get data (with user consent)
 rnote over e1
  Check consent of User
- to Entity 2
+ for each entity
+ accessing the data
 endrnote
 activate e1
 e1 --> e2 : Return data

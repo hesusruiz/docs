@@ -8,15 +8,15 @@ hide footbox
 title Via the user with W3C Credentials
 
 actor User
-participant "Entity 1" as e1
-participant "Entity 2" as e2
+participant "Source\nEntity" as e1
+collections "Target\nEntities" as e2
 
 e1 -> User : Credential (W3C)
 rnote over User
  User stores Credentials
  and sends them
  without involvement
- from Entity 1
+ from source Entity
 endrnote
 
 User -> e2 : Presentation (of Credential)

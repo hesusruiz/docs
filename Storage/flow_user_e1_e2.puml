@@ -8,13 +8,15 @@ hide footbox
 title Send data by request from user
 
 actor User
-participant "Entity 1" as e1
-participant "Entity 2" as e2
+participant "Source\nEntity" as e1
+collections "Target\nEntities" as e2
 
 User -> e1 : Perform operation
 rnote over e1
- Normal way to send data
- (eg. bank transfer)
+ Sends personal data
+ on behalf of the user
+ Needs consent for
+ all targets
 endrnote
 e1 -> e2 : Send data
 
